@@ -1,0 +1,27 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Notes & docs
+*.txt
+*.sql
+*.md
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build artifacts
+bin/
+tmp/
+*.exe
