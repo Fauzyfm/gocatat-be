@@ -119,6 +119,27 @@ func main() {
 		Expiration: time.Duration(rateLimitExp) * time.Second,
 	}))
 
+	// Health Check — untuk monitoring EasyPanel & uptime check
+	app.Get("/health", func(c *fiber.Ctx) error {
+		dbStatus := "ok"
+		if err := db.Ping(); err != nil {
+			dbStatus = "down"
+		}
+
+		status := "healthy"
+		httpCode := 200
+		if dbStatus != "ok" {
+			status = "unhealthy"
+			httpCode = 503
+		}
+
+		return c.Status(httpCode).JSON(fiber.Map{
+			"status":   status,
+			"database": dbStatus,
+			"env":      os.Getenv("APP_ENV"),
+		})
+	})
+
 	// Routes
 	api := app.Group("/api/v1")
 
