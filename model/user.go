@@ -21,6 +21,10 @@ type User struct {
 	ConfirmPassword string `json:"-"`
 	Role RoleType `json:"role"`
 
+	Provider string `json:"provider,omitempty"`
+	IsVerified bool `json:"is_verified"`
+	VerificationToken string `json:"-"`
+	
 	CreatedAt time.Time	`json:"createdAt"`
 	UpdateAt	time.Time	`json:"updateAt"`
 	DeletedAt	*time.Time	`json:"-"`
@@ -28,3 +32,8 @@ type User struct {
 	Balance []Balance	`json:"balances,omitempty"`
 }
 
+type GoogleUserInfo struct {
+    Email         string `json:"email"`
+    EmailVerified bool   `json:"email_verified"`
+    Name          string `json:"name"`
+}

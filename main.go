@@ -28,6 +28,8 @@ func main() {
 		log.Println("[WARN] File .env tidak ditemukan, menggunakan environment variable sistem")
 	}
 
+	config.InitGoogleOauth()
+
 	// Connect DB
 	db, err := config.ConnectDB()
 	if err != nil {
@@ -148,6 +150,14 @@ func main() {
 	auth.Post("/register", authHandler.Register)
 	auth.Post("/login", authHandler.Login)
 	auth.Post("/logout", authHandler.Logout)
+	auth.Get("/verify", authHandler.VerifyEmail)
+	auth.Post("/resend-verification", authHandler.ResendVerificationToken)
+	auth.Post("/verification-change-password", authHandler.VerificationChangePassword)
+	auth.Post("/change-password", authHandler.ChangePassword)
+
+	// Google OAuth2 Routes
+	auth.Get("/google/login", authHandler.GoogleLogin)
+	auth.Get("/google/callback", authHandler.GoogleCallback)
 
 	// Balance Routes
 	balance := api.Group("/balance", middleware.AuthRequired)
