@@ -9,6 +9,7 @@ import (
 	"manajemen-keuangan-api/model"
 	"manajemen-keuangan-api/repository"
 	"manajemen-keuangan-api/utils"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -83,11 +84,9 @@ func (s *AuthService) Register(ctx context.Context, userName string, email strin
 		return nil, fmt.Errorf("gagal menyimpan user!")
 	}
 
-	go func() {
-        if err := utils.SendVerificationEmail(user.Email, verificationToken); err != nil {
-            log.Printf("[WARN] gagal kirim email verifikasi ke %s: %v", user.Email, err)
-        }
-    }()
+	utils.RunBackground("kirim-email-verifikasi", 10 * time.Second, func(ctx context.Context) error {
+		return utils.SendVerificationEmail(user.Email, verificationToken)
+	})
 
 	return user, nil
 
@@ -273,9 +272,9 @@ func (s *AuthService) GoogleUser(ctx context.Context, username, email string) (*
 		return nil, fmt.Errorf("gagal mengambil data user: %w", err)
 	}
 
-	if existingUser.Provider != "google" {
-		return nil, fmt.Errorf("Emmail sudah terdaftar dengan provider %s, silahkan login dengan metode tersebut", existingUser.Provider)
-	}
+	// if existingUser.Provider != "google" {
+	// 	return nil, fmt.Errorf("Emmail sudah terdaftar dengan provider %s, silahkan login dengan metode tersebut", existingUser.Provider)
+	// }
 
 	if !existingUser.IsVerified {
 		if err := s.authRepo.MarkGoogleVerified(ctx, existingUser.ID); err != nil {

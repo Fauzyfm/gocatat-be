@@ -7,6 +7,8 @@ import (
 	"manajemen-keuangan-api/model"
 	"manajemen-keuangan-api/repository"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type TransactionService struct {
@@ -54,26 +56,40 @@ func (s *TransactionService) CreateTransaction(
 		return nil, fmt.Errorf("category hanya bisa income / expense")
 	}
 
+
+	g, gctx := errgroup.WithContext(ctx)
+	var existingBalance *model.Balance
+	var amountBalance int64
+
 	// cek balance milik user teresbut
-	_, err := s.repoBalance.GetBalanceByIDAndUserID(ctx, balanceID, userID)
-	if err != nil {
-		return nil, err
-	}
+	g.Go(func() error  {
+		var err error
+		existingBalance, err = s.repoBalance.GetBalanceByIDAndUserID(gctx, balanceID, userID)
+		return  err
+	})
 
 	// check apakah amount balance
-	amountBlance, err := s.repoBalance.CheckAmountBalance(ctx, userID, balanceID)
-	if err != nil {
+	g.Go(func() error {
+		var err error
+		amountBalance, err = s.repoBalance.CheckAmountBalance(gctx, userID, balanceID)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
+	_ = existingBalance
+
+
 	// cek saldo cukup untuk expense/pengeluaran
 	if category == model.CategoryTypeExpense {
-		if amountBlance < amount {
-			return nil, fmt.Errorf("saldo tidak cukup: saldo Rp%d, dibutuhkan Rp%d", amountBlance, amount)
+		if amountBalance < amount {
+			return nil, fmt.Errorf("saldo tidak cukup: saldo Rp%d, dibutuhkan Rp%d", amountBalance, amount)
 		}
 	}
 
 	// check point
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return nil, fmt.Errorf("gagal memulai transaksi databse: %w", err)
 	}

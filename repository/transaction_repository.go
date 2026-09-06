@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"manajemen-keuangan-api/model"
+	"sync"
 	"time"
 )
 
@@ -122,6 +123,12 @@ func (r *PostgresTransactionRepository) DeleteTransaction(ctx context.Context, i
 }
 
 func (r *PostgresTransactionRepository) GetSummary(ctx context.Context, userID uint, start, end time.Time) (model.Summary, error) {
+
+	var s model.Summary
+	var errIncomeExpense, errTotalBalance error
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	query := `
 		SELECT
 		COALESCE(SUM(CASE WHEN category = 'income' THEN amount ELSE 0 END), 0) AS income,
@@ -131,13 +138,10 @@ func (r *PostgresTransactionRepository) GetSummary(ctx context.Context, userID u
 			AND created_at >= $2
 			AND created_at <= $3
 	`
-
-	var s model.Summary
-	err := r.db.QueryRowContext(ctx, query, userID, start, end).Scan(&s.Income, &s.Expense)
-	if err != nil {
-		return model.Summary{}, fmt.Errorf("gagal mengambil summary: %w", err)
-	}
-
+	go func ()  {
+		defer wg.Done()
+		errIncomeExpense = r.db.QueryRowContext(ctx, query, userID, start, end).Scan(&s.Income, &s.Expense)
+	}()
 	query2 := `
 		SELECT COALESCE(SUM(
 		CASE WHEN category = 'income' THEN amount
@@ -146,10 +150,20 @@ func (r *PostgresTransactionRepository) GetSummary(ctx context.Context, userID u
 		), 0) AS total_balances
 		FROM transactions WHERE user_id = $1
 	`
+	go func ()  {
+		wg.Done()
+		errTotalBalance = r.db.QueryRowContext(ctx, query2, userID).Scan(&s.AllBalance)
+	}()
 
-	err = r.db.QueryRowContext(ctx, query2, userID).Scan(&s.AllBalance)
-	if err != nil {
-		return model.Summary{}, fmt.Errorf("gagal mengambil data balances: %w", err)
+	wg.Wait()
+
+
+	if errIncomeExpense != nil {
+		return model.Summary{}, fmt.Errorf("gagal mengambil summary: %w", errIncomeExpense)
+	}
+
+	if errTotalBalance != nil {
+		return model.Summary{}, fmt.Errorf("gagal mengambil data balances: %w", errTotalBalance)
 	}
 
 	return s, nil
@@ -340,3 +354,4 @@ func (r *PostgresTransactionRepository) GetAllTransactionPaginated(ctx context.C
 		TotalPages: totalPages,
 	}, nil
 }
+
